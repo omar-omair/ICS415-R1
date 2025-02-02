@@ -27,10 +27,11 @@ t_max = float("inf")
 
 def canvas_to_viewport(x, y):
     return np.array([
-        x * viewport_size / WIDTH, 
-        y * viewport_size / HEIGHT, 
+        x * viewport["width"] / WIDTH, 
+        y * viewport["height"] / HEIGHT, 
         viewport["distance"]
     ])
+
 
 
 # Helper function: Ray-sphere intersection
@@ -74,6 +75,7 @@ def trace_ray(ray_origin, ray_direction):
     intensity = computeLighting(P, N, view_direction, closest_sphere)
     color = np.array(closest_sphere["color"]) * intensity
 
+    color = np.clip(color, 0, 255)
     pixel_color = tuple(color.astype(int))
 
     return pixel_color
@@ -95,13 +97,14 @@ def computeLighting(P, N, V, sphere):
             n_dot_l = np.dot(N, light_vector)
 
             if n_dot_l > 0:
-                intensity += l["intensity"] * n_dot_l/(np.linalg.norm(N) * np.linalg.norm(P))
+                intensity += l["intensity"] * n_dot_l
             
             if sphere["shine"] != -1:
                 R = 2 * N * np.dot(N, light_vector) - light_vector
                 r_dot_v = np.dot(R, V)
                 if r_dot_v > 0:
-                    intensity += l["intensity"] * (r_dot_v / (np.linalg.norm(R) * np.linalg.norm(V))) ** sphere["shine"]
+                    intensity += l["intensity"] * (r_dot_v ** sphere["shine"])
+
 
     return min(intensity, 1)
 
