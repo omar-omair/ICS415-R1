@@ -1,0 +1,10 @@
+^C:\USERS\OMARO\DOCUMENTS\ICS415\ICS415-R1\PROJECT-1\BUILD\CMAKEFILES\C9579B2A81538E5F3B10C020B23B4844\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/omaro/Documents/ICS415/ICS415-R1/Project-1 -BC:/Users/omaro/Documents/ICS415/ICS415-R1/Project-1/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/omaro/Documents/ICS415/ICS415-R1/Project-1/build/RTWeekend.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

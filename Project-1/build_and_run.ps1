@@ -1,0 +1,1 @@
+cmake --build build --config Release; .\build\Release\inOneWeekend.exe > image.ppm;
