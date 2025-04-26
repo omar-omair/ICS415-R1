@@ -10,6 +10,27 @@ repositories {
     mavenCentral()
 }
 
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17 // or your version
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+val mainClass = "org.example.VoxelEngine"
+
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = mainClass
+    }
+
+    // Include dependencies in the JAR (fat JAR)
+    from({
+        configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
+    })
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 dependencies {
     implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
 
