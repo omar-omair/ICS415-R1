@@ -37,4 +37,4 @@ This renderer uses ray tracing to simulate how light interacts with objects in a
 
 This is with a camera width of "1200px" and 500 samples per pixel. It took over 30 mins to generate. play with the numbers and see the difference!
 
-[image](imageConverted.png)
+![image](imageConverted.png)
