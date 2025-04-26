@@ -21,7 +21,7 @@ Features
 
 ## To Run It
 
-    1. Clone the Repository or download the jar directly from "build/libs/your-project-name.jar"
+    1. Clone the Repository or download the jar directly from "build/libs/Project-3.jar"
     2. run the command "java -jar build/libs/Project-3.jar" or "java -jar Project-3.jar" depending on step 1
 
 
