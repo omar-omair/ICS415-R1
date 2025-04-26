@@ -29,6 +29,8 @@ public class VoxelEngine {
     private Shader shader;
     private double lastX = 400, lastY = 300;
     private boolean firstMouse = true;
+    private Shader crosshairShader;
+    private int crosshairVAO;
 
     public void run() {
         init();
@@ -47,6 +49,8 @@ public class VoxelEngine {
         glfwMakeContextCurrent(window);
         GL.createCapabilities();
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_POINT_SMOOTH);
+        glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
 
         camera = new Camera();
         chunk = new Chunk();
@@ -55,6 +59,7 @@ public class VoxelEngine {
 
         Texture.loadTextures();
         shader = new Shader(loadShaderFile("vertex.glsl"), loadShaderFile("fragment.glsl"));
+        setupCrosshair();
 
         glfwSetCursorPosCallback(window, (window, xpos, ypos) -> {
             if (firstMouse) {
@@ -75,8 +80,41 @@ public class VoxelEngine {
     }
 
     private void loop() {
+        long lastFrameTime = System.nanoTime();
+
         while (!glfwWindowShouldClose(window)) {
-            processInput();
+            long currentTime = System.nanoTime();
+            float deltaTime = (currentTime - lastFrameTime) / 1_000_000_000f;
+            lastFrameTime = currentTime;
+
+            Vector3f origin = new Vector3f(camera.position);
+            Vector3f direction = new Vector3f(camera.front).normalize();
+
+            Raycast.HitResult result = Raycast.castRay(origin, direction, chunk, 10.0f);
+
+            if (result != null) {
+                if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+                    // Destroy block
+                    Vector3i pos = result.blockPos;
+                    if (Raycast.inChunkBounds(pos)) {
+                        chunk.blocks[pos.x][pos.y][pos.z] = Block.AIR;
+                    }
+                } else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+                    // Place block on the face hit
+                    Vector3i placePos = new Vector3i(result.blockPos).add(result.hitNormal);
+
+                    if (Raycast.inChunkBounds(placePos)
+                            && chunk.blocks[placePos.x][placePos.y][placePos.z] == Block.AIR) {
+                        chunk.blocks[placePos.x][placePos.y][placePos.z] = Block.GRASS;
+                    }
+                }
+            }
+
+            if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+                glfwSetWindowShouldClose(window, true);
+            }
+
+            camera.processKeyboard(window, deltaTime);
 
             glClearColor(0.5f, 0.7f, 1.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -86,47 +124,15 @@ public class VoxelEngine {
             shader.use();
             shader.setMat4("projection", camera.getProjectionMatrix());
             shader.setMat4("view", camera.getViewMatrix());
-
             chunk.render(shader);
+
+            renderCrosshair();
 
             glfwSwapBuffers(window);
             glfwPollEvents();
         }
     }
 
-    private void processInput() {
-        camera.processKeyboard(window);
-
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, true);
-
-        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
-            handleBlockBreaking();
-
-        if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS)
-            handleBlockPlacement();
-    }
-
-    private void handleBlockBreaking() {
-        RaycastResult result = raycast();
-        if (result != null && isValidBlockPosition(result.blockPos)) {
-            chunk.blocks[result.blockPos.x][result.blockPos.y][result.blockPos.z] = Block.AIR;
-        }
-    }
-
-    private void handleBlockPlacement() {
-        RaycastResult result = raycast();
-        if (result != null) {
-            Vector3i placePos = new Vector3i(result.blockPos)
-                    .add((int) Math.signum(result.faceNormal.x),
-                            (int) Math.signum(result.faceNormal.y),
-                            (int) Math.signum(result.faceNormal.z));
-
-            if (isValidBlockPosition(placePos)) {
-                chunk.blocks[placePos.x][placePos.y][placePos.z] = Block.GRASS;
-            }
-        }
-    }
 
     private boolean isValidBlockPosition(Vector3i pos) {
         return pos.x >= 0 && pos.x < Chunk.CHUNK_SIZE &&
@@ -142,73 +148,6 @@ public class VoxelEngine {
         }
     }
 
-    private RaycastResult raycast() {
-        // Get mouse coordinates
-        DoubleBuffer xBuf = BufferUtils.createDoubleBuffer(1);
-        DoubleBuffer yBuf = BufferUtils.createDoubleBuffer(1);
-        glfwGetCursorPos(window, xBuf, yBuf);
-        double mouseX = xBuf.get(0);
-        double mouseY = yBuf.get(0);
-
-        // Convert to NDC
-        float x = (float) ((2.0 * mouseX) / 800 - 1.0f);
-        float y = (float) (1.0 - (2.0 * mouseY) / 600);
-        Vector4f rayClip = new Vector4f(x, y, -1.0f, 1.0f);
-
-        // Convert to world space
-        Matrix4f invProjection = new Matrix4f(camera.getProjectionMatrix()).invert();
-        Vector4f rayEye = invProjection.transform(rayClip);
-        rayEye.z = -1.0f;
-        rayEye.w = 0.0f;
-
-        Matrix4f invView = new Matrix4f(camera.getViewMatrix()).invert();
-        Vector4f rayWorld = invView.transform(rayEye);
-        Vector3f rayDir = new Vector3f(rayWorld.x, rayWorld.y, rayWorld.z).normalize();
-
-        // Ray marching
-        Vector3f currentPos = new Vector3f(camera.position);
-        Vector3f step = rayDir.mul(0.05f);
-        Vector3i lastValid = null;
-        Vector3f faceNormal = new Vector3f();
-
-        for (int i = 0; i < 100; i++) {
-            Vector3i blockPos = new Vector3i(
-                    (int) Math.floor(currentPos.x),
-                    (int) Math.floor(currentPos.y),
-                    (int) Math.floor(currentPos.z)
-            );
-
-            if (isValidBlockPosition(blockPos)) {
-                if (chunk.blocks[blockPos.x][blockPos.y][blockPos.z] != Block.AIR) {
-                    // Calculate face normal
-                    faceNormal.set(
-                            currentPos.x - blockPos.x - 0.5f,
-                            currentPos.y - blockPos.y - 0.5f,
-                            currentPos.z - blockPos.z - 0.5f
-                    );
-
-                    Vector3f absNormal = new Vector3f(faceNormal).absolute();
-                    int dominantAxis = absNormal.maxComponent(); // Returns 0 (x), 1 (y), or 2 (z)
-
-                    faceNormal.set(0, 0, 0);
-                    switch (dominantAxis) {
-                        case 0 -> faceNormal.x = Math.signum(faceNormal.x);
-                        case 1 -> faceNormal.y = Math.signum(faceNormal.y);
-                        case 2 -> faceNormal.z = Math.signum(faceNormal.z);
-                    }
-
-                    return new RaycastResult(blockPos, faceNormal);
-                }
-                lastValid = blockPos;
-            }
-            currentPos.add(step);
-        }
-
-        // If no block hit, return last valid position in chunk
-        return lastValid != null ? new RaycastResult(lastValid, new Vector3f()) : null;
-    }
-
-
     private void cleanup() {
         glfwFreeCallbacks(window);
         glfwDestroyWindow(window);
@@ -216,17 +155,36 @@ public class VoxelEngine {
         Objects.requireNonNull(glfwSetErrorCallback(null)).free();
     }
 
-    public static void main(String[] args) {
-        new VoxelEngine().run();
+    private void setupCrosshair() {
+        crosshairShader = new Shader(
+                loadShaderFile("crosshair.vert"),
+                loadShaderFile("crosshair.frag")
+        );
+
+        crosshairVAO = glGenVertexArrays();
+        glBindVertexArray(crosshairVAO);
+        glBindVertexArray(0);
     }
 
-    private static class RaycastResult {
-        public final Vector3i blockPos;
-        public final Vector3f faceNormal;
+    private void renderCrosshair() {
+        // Disable depth test
+        glDisable(GL_DEPTH_TEST);
 
-        public RaycastResult(Vector3i blockPos, Vector3f faceNormal) {
-            this.blockPos = blockPos;
-            this.faceNormal = faceNormal;
-        }
+        // Use crosshair shader
+        crosshairShader.use();
+
+        // Draw
+        glBindVertexArray(crosshairVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindVertexArray(0);
+
+        // Restore state
+        glEnable(GL_DEPTH_TEST);
+    }
+
+
+
+    public static void main(String[] args) {
+        new VoxelEngine().run();
     }
 }

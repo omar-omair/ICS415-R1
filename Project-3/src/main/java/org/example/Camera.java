@@ -15,6 +15,8 @@ public class Camera {
     public final Vector3f right = new Vector3f();
     public float speed = 0.1f;
     public float sensitivity = 0.1f;
+    private float baseSpeed = 0.2f; // Adjusted base speed
+    private float currentSpeed = baseSpeed;
 
     public Camera() {
         projectionMatrix.setPerspective((float) Math.toRadians(70), 800f/600f, 0.1f, 1000f);
@@ -27,17 +29,18 @@ public class Camera {
                 .lookAt(position, position.add(front, new Vector3f()), up);
     }
 
-    public void processKeyboard(long window) {
+    public void processKeyboard(long window, float deltaTime) {
+        float velocity = currentSpeed * deltaTime;
         Vector3f movement = new Vector3f();
 
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            movement.add(front);
+            movement.add(front.mul(velocity));
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            movement.sub(front);
+            movement.sub(front.mul(velocity));
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            movement.sub(right);
+            movement.sub(right.mul(velocity));
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            movement.add(right);
+            movement.add(right.mul(velocity));
 
         if (movement.lengthSquared() > 0)
             position.add(movement.normalize().mul(speed));
