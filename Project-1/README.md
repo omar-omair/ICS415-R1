@@ -1,6 +1,6 @@
 # 🌌 Ray Tracer from Scratch
 
-A simple yet powerful ray tracer written in C++, built from the ground up using only the standard library. This project renders 3D scenes with realistic lighting, reflections, shadows, and materials like metal and glass. it follows the guide of [!"Raytracing in one weekend"](https://raytracing.github.io/books/RayTracingInOneWeekend.html) 
+A simple yet powerful ray tracer written in C++, built from the ground up using only the standard library. This project renders 3D scenes with realistic lighting, reflections, shadows, and materials like metal and glass. it follows the guide of ["Raytracing in one weekend"](https://raytracing.github.io/books/RayTracingInOneWeekend.html) 
 
 ## 📖 Overview
 
@@ -37,4 +37,4 @@ This renderer uses ray tracing to simulate how light interacts with objects in a
 
 This is with a camera width of "1200px" and 500 samples per pixel. It took over 30 mins to generate. play with the numbers and see the difference!
 
-[!image](image.ppm)
+[image](imageConverted.png)
