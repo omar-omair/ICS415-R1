@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bézier Curve Editor</title>
+    <style>
+        canvas {
+            border: 1px solid #000;
+            background: #fff;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 20px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .coord-display {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            background: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="addNewCurve()">Add New Curve</button>
+        <button onclick="resetCanvas()">Reset</button>
+    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div class="coord-display" id="coords"></div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const coordsDiv = document.getElementById('coords');
+
+let segments = []; 
+let selectedPoint = null;
+let hoverPoint = null;
+let showControlLines = true;
+
+class BezierSegment {
+    constructor(p0, p1, p2, p3) {
+        this.points = [p0, p1, p2, p3];
+    }
+}
+
+
+addNewCurve();
+
+function addNewCurve() {
+    const lastPoint = segments.length > 0 
+        ? segments[segments.length-1].points[3]
+        : {x: 100, y: 300};
+    
+    const newSegment = new BezierSegment(
+        {...lastPoint},
+        {x: lastPoint.x + 50, y: lastPoint.y - 100},
+        {x: lastPoint.x + 150, y: lastPoint.y - 100},
+        {x: lastPoint.x + 200, y: lastPoint.y}
+    );
+    
+    segments.push(newSegment);
+}
+
+function resetCanvas() {
+    segments = [];
+    addNewCurve();
+}
+
+function calculateCubicBezier(p0, p1, p2, p3, t) {
+    return {
+        x: (1 - t)**3 * p0.x + 3*(1 - t)**2*t * p1.x + 3*(1 - t)*t**2 * p2.x + t**3 * p3.x,
+        y: (1 - t)**3 * p0.y + 3*(1 - t)**2*t * p1.y + 3*(1 - t)*t**2 * p2.y + t**3 * p3.y
+    };
+}
+
+function drawPoint(p, isAnchor) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, isAnchor ? 6 : 5, 0, Math.PI*2);
+    ctx.fillStyle = isAnchor ? (p === hoverPoint ? '#ff4444' : '#ff0000') : 
+                      (p === hoverPoint ? '#44aaff' : '#0066ff');
+    ctx.fill();
+}
+
+function drawCurve() {
+    segments.forEach(segment => {
+        const [p0, p1, p2, p3] = segment.points;
+        
+        // Draw control lines
+        if(showControlLines) {
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.moveTo(p2.x, p2.y);
+            ctx.lineTo(p3.x, p3.y);
+            ctx.strokeStyle = '#aaa';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        
+        // Draw curve
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        for(let t = 0; t <= 1; t += 0.01) {
+            const pt = calculateCubicBezier(p0, p1, p2, p3, t);
+            ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    });
+}
+
+function getMousePos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+    };
+}
+
+function findNearestPoint(pos) {
+    for(const segment of segments) {
+        for(const point of segment.points) {
+            const dx = point.x - pos.x;
+            const dy = point.y - pos.y;
+            if(Math.sqrt(dx*dx + dy*dy) < 10) return point;
+        }
+    }
+    return null;
+}
+
+canvas.addEventListener('mousedown', e => {
+    const pos = getMousePos(e);
+    selectedPoint = findNearestPoint(pos);
+    
+    // Right click to delete point
+    if(e.button === 2 && selectedPoint) {
+        deletePoint(selectedPoint);
+        selectedPoint = null;
+    }
+});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('mousemove', e => {
+    const pos = getMousePos(e);
+    hoverPoint = findNearestPoint(pos);
+    
+    if(selectedPoint) {
+        selectedPoint.x = pos.x;
+        selectedPoint.y = pos.y;
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    selectedPoint = null;
+});
+
+function deletePoint(point) {
+    for(let i = segments.length-1; i >= 0; i--) {
+        const segment = segments[i];
+        const index = segment.points.indexOf(point);
+        
+        if(index !== -1) {
+            if(index === 0 && i > 0) {
+                // Connect previous segment to next point
+                segments[i-1].points[3] = segment.points[3];
+            }
+            segments.splice(i, 1);
+        }
+    }
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if(hoverPoint) {
+        coordsDiv.textContent = `X: ${hoverPoint.x.toFixed(0)}, Y: ${hoverPoint.y.toFixed(0)}`;
+    } else {
+        coordsDiv.textContent = '';
+    }
+    
+    drawCurve();
+    
+    // Draw all points
+    segments.forEach(segment => {
+        segment.points.forEach((p, i) => {
+            drawPoint(p, i === 0 || i === 3);
+        });
+    });
+    
+    requestAnimationFrame(update);
+}
+
+update();
+</script>
+</body>
+</html>
