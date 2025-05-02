@@ -8,4 +8,4 @@ Project two - Shader conversion from shader toy to unity
 
 Project three - Simple Voxel Engine (minecraft-like)
 
-Project four - Work in progress
+Project four - Bezier Curve Editor
